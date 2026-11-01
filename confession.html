@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>하율아, 할 말이 있어</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif;
+    background: linear-gradient(160deg, #ffd6e7 0%, #ffb3d1 45%, #e5b8ff 100%);
+    color: #5a2a45;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas#bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .card {
+    position: relative; z-index: 1;
+    width: min(90vw, 440px);
+    min-height: 320px;
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(8px);
+    border-radius: 28px;
+    box-shadow: 0 20px 60px rgba(180, 60, 120, 0.25);
+    padding: 40px 28px 32px;
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 22px;
+  }
+  .emoji { font-size: 56px; animation: bob 2s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .text {
+    font-size: 24px; line-height: 1.6; font-weight: 700; min-height: 80px;
+    display: flex; align-items: center; justify-content: center;
+    white-space: pre-line; word-break: keep-all;
+  }
+  .pop { animation: pop .4s ease; }
+  @keyframes pop { 0% { transform: scale(.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  button {
+    font-family: inherit; font-size: 20px; font-weight: 700;
+    border: none; border-radius: 999px; padding: 14px 38px; cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+  }
+  button:active { transform: scale(.95); }
+  .choices { display: flex; gap: 16px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .yes { background: #ff4d8d; color: #fff; box-shadow: 0 6px 18px rgba(255,77,141,.5); }
+  .no { background: #e9e0ee; color: #7a5a70; }
+  .count { font-size: 13px; opacity: .55; min-height: 16px; }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+
+<div class="card">
+  <div class="emoji" id="emoji">🥺</div>
+  <div class="text pop" id="text"></div>
+  <div class="choices" id="choices">
+    <button class="yes" id="yes">응 💖</button>
+    <button class="no" id="no">싫어</button>
+  </div>
+  <div class="count" id="count"></div>
+</div>
+
+<script>
+// ====== 설정 ======
+const PHONE = '01067596649';
+const QUESTION = '하율아,\n나랑 사귈래? 💕';
+// =================
+
+const $ = id => document.getElementById(id);
+const text = $('text'), emoji = $('emoji'), yes = $('yes'), no = $('no'), count = $('count');
+text.textContent = QUESTION;
+
+let noCount = 0;
+const sadFaces = ['🥺', '😢', '😭', '🥹'];
+
+// 싫어 → 다시 같은 질문 (계속 반복)
+no.onclick = () => {
+  noCount++;
+  emoji.textContent = sadFaces[noCount % sadFaces.length];
+  text.classList.remove('pop'); void text.offsetWidth; text.classList.add('pop');
+  text.textContent = QUESTION;
+  count.textContent = `거절 ${noCount}번째... 다시 물어볼게 🥺`;
+};
+
+// 응 → 전화 연결
+yes.onclick = () => {
+  emoji.textContent = '🥰';
+  text.classList.remove('pop'); void text.offsetWidth; text.classList.add('pop');
+  text.textContent = '고마워 💖\n전화 걸게!';
+  count.textContent = '';
+  burst();
+  setTimeout(() => { location.href = 'tel:' + PHONE; }, 900);
+};
+
+// ====== 배경: 떠다니는 하트 + 폭죽 ======
+const cv = $('bg'), ctx = cv.getContext('2d');
+function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+const hearts = Array.from({ length: 28 }, () => newHeart(true));
+function newHeart(init) {
+  return {
+    x: Math.random() * innerWidth,
+    y: init ? Math.random() * innerHeight : innerHeight + 20,
+    s: 10 + Math.random() * 22,
+    v: 0.4 + Math.random() * 0.9,
+    a: 0.25 + Math.random() * 0.4,
+    w: Math.random() * Math.PI * 2,
+  };
+}
+function drawHeart(x, y, s, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y + s * 0.3);
+  ctx.bezierCurveTo(x, y, x - s * 0.5, y, x - s * 0.5, y + s * 0.3);
+  ctx.bezierCurveTo(x - s * 0.5, y + s * 0.6, x, y + s * 0.8, x, y + s);
+  ctx.bezierCurveTo(x, y + s * 0.8, x + s * 0.5, y + s * 0.6, x + s * 0.5, y + s * 0.3);
+  ctx.bezierCurveTo(x + s * 0.5, y, x, y, x, y + s * 0.3);
+  ctx.fill();
+}
+
+let particles = [];
+function burst() {
+  const colors = ['#ff4d8d', '#ff9ec4', '#ffd166', '#c77dff', '#fff'];
+  for (let i = 0; i < 140; i++) {
+    const ang = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 9;
+    particles.push({
+      x: innerWidth / 2, y: innerHeight / 2,
+      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 3,
+      s: 8 + Math.random() * 16, life: 1,
+      c: colors[Math.floor(Math.random() * colors.length)],
+    });
+  }
+}
+
+function loop() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  hearts.forEach((h, i) => {
+    h.y -= h.v; h.w += 0.02;
+    h.x += Math.sin(h.w) * 0.5;
+    ctx.globalAlpha = h.a;
+    drawHeart(h.x, h.y, h.s, '#ff6fa5');
+    if (h.y < -40) hearts[i] = newHeart(false);
+  });
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.life -= 0.008;
+    ctx.globalAlpha = Math.max(p.life, 0);
+    drawHeart(p.x, p.y, p.s, p.c);
+  });
+  particles = particles.filter(p => p.life > 0);
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
